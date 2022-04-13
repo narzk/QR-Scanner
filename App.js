@@ -6,107 +6,125 @@
  * @flow strict-local
  */
 
-import React from 'react';
-import type {Node} from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  Text,
-  useColorScheme,
-  View,
-} from 'react-native';
+import React, {useState, Component} from 'react';
+import {createStore, Provider} from 'redux';
+import {StyleSheet, Text, View, Modal, Alert, Pressable} from 'react-native';
 
-import {
-  Colors,
-  DebugInstructions,
-  Header,
-  LearnMoreLinks,
-  ReloadInstructions,
-} from 'react-native/Libraries/NewAppScreen';
+import ScanScreen from './android/app/components/ScanScreen';
 
-const Section = ({children, title}): Node => {
-  const isDarkMode = useColorScheme() === 'dark';
+import {connect} from 'react-redux';
+import {scanner} from './android/app/redux/actions/scanner';
+import {bindActionCreators} from 'redux';
+
+import scannerReducer from './android/app/redux/reducers/scannerReducer';
+
+const ModalApp = ({modalVisible, handelClose, data}) => {
   return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-};
-
-const App: () => Node = () => {
-  const isDarkMode = useColorScheme() === 'dark';
-
-  const backgroundStyle = {
-    backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
-  };
-
-  return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.js</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={modalVisible}
+      onRequestClose={() => {
+        Alert.alert('Modal has been closed.');
+        handelClose;
+      }}>
+      <View style={styles.centeredView}>
+        <View style={styles.modalView}>
+          <Pressable
+            style={[styles.button, styles.buttonClose]}
+            onPress={() => handelClose()}></Pressable>
+          {Object.values(data).map(item => (
+            <Text>{item}</Text>
+          ))}
         </View>
-      </ScrollView>
-    </SafeAreaView>
+      </View>
+    </Modal>
   );
 };
+const store = createStore(scannerReducer);
+
+class App extends Component {
+  state = {
+    modalVisible: false,
+  };
+  handelResult = () => {
+    this.setState({
+      modalVisible: true,
+    });
+  };
+  handelClose = () => {
+    this.setState({
+      modalVisible: false,
+    });
+  };
+  onSuccess = e => {
+    let {actions} = this.props;
+
+    actions
+      .scanner(e.data)
+      .catch(err => console.error('An error occured', err));
+  };
+  render() {
+    const {data} = this.props;
+    return (
+      <Provider store={store}>
+        <ModalApp
+          modalVisible={this.state.modalVisible}
+          handelClose={this.handelClose}
+          data={data}
+        />
+        <ScanScreen
+          handelResult={this.handelResult}
+          onSuccess={this.onSuccess}
+        />
+      </Provider>
+    );
+  }
+}
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    marginTop: 32,
-    paddingHorizontal: 24,
+  centeredView: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 22,
   },
-  sectionTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+  modalView: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 20,
+    padding: 35,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  sectionDescription: {
-    marginTop: 8,
-    fontSize: 18,
-    fontWeight: '400',
+  button: {
+    borderRadius: 20,
+    padding: 10,
+    elevation: 2,
   },
-  highlight: {
-    fontWeight: '700',
+
+  buttonClose: {
+    backgroundColor: '#2196F3',
   },
 });
 
-export default App;
+const mapStateToProps = state => {
+  const {data} = state;
+  return {data};
+};
+const mapDispatchToProps = dispatch =>
+  bindActionCreators(
+    {
+      scanner,
+    },
+    dispatch,
+  );
+
+export default connect(mapStateToProps, mapDispatchToProps)(App);
